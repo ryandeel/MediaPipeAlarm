@@ -1,9 +1,9 @@
-# 1) Create and activate a virtual environment (recommended)
+## 1) Create and activate a virtual environment
 python -m venv .venv
-# Windows:
+#### Windows:
 .venv\Scripts\activate
-# Linux/macOS:
+#### Linux/macOS:
 source .venv/bin/activate
 
-# 2) install all dependencies
+## 2) install all dependencies
 pip install -r dependencies.txt
