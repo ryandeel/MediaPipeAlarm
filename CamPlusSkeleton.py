@@ -1,6 +1,7 @@
 #I literally just copy pasted this from avery and ryans code lol.
 
 import os
+import time
 import cv2 as cv
 import numpy as np
 import mediapipe as mp
@@ -24,14 +25,19 @@ def draw_landmarks_on_image(rgb_image, detection_result):
 
 model_path = os.path.abspath("models/pose_landmarker_heavy.task")
 
+#VIDEO mode tracks the person between frames instead of starting over every frame, so less jitter
 options = vision.PoseLandmarkerOptions(
     base_options=mp.tasks.BaseOptions(model_asset_path=model_path),
-    running_mode=vision.RunningMode.IMAGE)
+    running_mode=vision.RunningMode.VIDEO)
 detector = vision.PoseLandmarker.create_from_options(options)
 
 #cam setup from avery 
 
 cam = cv.VideoCapture(0)
+
+#VIDEO mode needs a timestamp (ms) for every frame and it has to keep going up
+start = time.monotonic()
+last_ts = -1
 
 while True:
     check, frame = cam.read()
@@ -41,7 +47,11 @@ while True:
     image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
 
     #detect posess
-    detection_result = detector.detect(image) #pose model does its magic and finds the person/landmarkss on them
+    ts = int((time.monotonic() - start) * 1000)
+    if ts <= last_ts: #two frames in the same ms would crash it, so bump by 1
+        ts = last_ts + 1
+    last_ts = ts
+    detection_result = detector.detect_for_video(image, ts) #pose model does its magic and finds the person/landmarkss on them
 
     #draw, then convert back to BGR for OpenCV to display
     annotated_image = draw_landmarks_on_image(rgb, detection_result)
