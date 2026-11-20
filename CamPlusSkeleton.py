@@ -64,3 +64,15 @@ while True:
 
 cam.release()
 cv.destroyAllWindows()
+
+def hands_above_head(detection_result):
+    if detection_result.pose_landmarks:
+        for pose_landmarks in detection_result.pose_landmarks:
+            left_wrist = pose_landmarks.landmark[vision.PoseLandmark.LEFT_WRIST]
+            right_wrist = pose_landmarks.landmark[vision.PoseLandmark.RIGHT_WRIST]
+            nose = pose_landmarks.landmark[vision.PoseLandmark.NOSE]
+
+            if left_wrist.y < nose.y and right_wrist.y < nose.y:
+                return True
+                print("hands above head")
+    return False
