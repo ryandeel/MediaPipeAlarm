@@ -21,7 +21,9 @@ from mediapipe.tasks.python.vision import drawing_utils, drawing_styles
 
 # ---------------- Settings you can change ----------------
 ALARM_TIME = "20:24"      # 24-hour HH:MM
+EXERCISE = "hands_up"     # "jumping_jacks" or "hands_up"
 TARGET_REPS = 15          # jumping jacks needed to turn the alarm off
+HOLD_SECONDS = 5          # seconds to hold hands above head to turn the alarm off
 ALLOW_ESC_QUIT = True     # set False for the "real" alarm so ESC can't cheat
 ARMS_UP_FEET_APART = 1.5  # ankle gap must be this many shoulder-widths to count as "apart"
 FEET_TOGETHER = 1.2       # ankle gap must be under this many shoulder-widths to count as "together"
@@ -74,6 +76,13 @@ def start_sound():
 def stop_sound():
     winsound.PlaySound(None, winsound.SND_PURGE)
 
+def hands_above_head_pose(result):
+    if not result.pose_landmarks:
+        return False
+
+    lm = result.pose_landmarks[0]
+    return lm[LEFT_WRIST].y < lm[NOSE].y and lm[RIGHT_WRIST].y < lm[NOSE].y
+
 
 def update_jumping_jacks(result, phase):
     if not result.pose_landmarks:
@@ -108,6 +117,10 @@ def update_jumping_jacks(result, phase):
     if phase == "up" and arms_down and feet_together:
         return "down", True
     return phase, False
+
+EXERCISE_NAME = {"jumping_jacks": "jumping jacks",
+                 "hands_up": f"hands above your head for {HOLD_SECONDS} seconds"}[EXERCISE]
+
 
 def draw_landmarks_on_image(rgb_image, result):
     annotated = np.copy(rgb_image)
@@ -169,10 +182,11 @@ def main():
 
             # ---- RINGING: start sound, open camera ----
             if state == RINGING:
-                print("WAKE UP! Do jumping jacks to turn it off.")
+                print(f"WAKE UP! Do {EXERCISE_NAME} to turn it off.")
                 start_sound()
                 cam = cv.VideoCapture(0)
                 reps, phase = 0, "down"
+                hold_start = None
                 state = EXERCISING
                 continue
 
@@ -194,15 +208,29 @@ def main():
             display = cv.cvtColor(draw_landmarks_on_image(rgb, result), cv.COLOR_RGB2BGR)
 
             if state == EXERCISING:
-                phase, rep_done = update_jumping_jacks(result, phase)
-                if rep_done:
-                    reps += 1
-                    print(f"Rep {reps}/{TARGET_REPS}")
-                if reps >= TARGET_REPS:
+                if EXERCISE == "hands_up":
+                    # Timer runs while hands stay up; dropping them resets it
+                    if hands_above_head_pose(result):
+                        if hold_start is None:
+                            hold_start = time.monotonic()
+                        held = time.monotonic() - hold_start
+                    else:
+                        hold_start = None
+                        held = 0.0
+                    finished = held >= HOLD_SECONDS
+                    put_text(display, f"Hands up: {min(held, HOLD_SECONDS):.1f}/{HOLD_SECONDS}s", 50)
+                elif EXERCISE == "jumping_jacks":
+                    phase, rep_done = update_jumping_jacks(result, phase)
+                    if rep_done:
+                        reps += 1
+                        print(f"Rep {reps}/{TARGET_REPS}")
+                    finished = reps >= TARGET_REPS
+                    put_text(display, f"Jumping jacks: {reps}/{TARGET_REPS}", 50)
+
+                if finished:
                     stop_sound()
                     state = DONE
                     done_at = time.monotonic()
-                put_text(display, f"Jumping jacks: {reps}/{TARGET_REPS}", 50)
                 if not result.pose_landmarks:
                     put_text(display, "Step back so I can see you", 100, 0.8, (0, 0, 255))
 
