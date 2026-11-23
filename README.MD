@@ -7,3 +7,6 @@ source .venv/bin/activate
 
 ## 2) install all dependencies
 pip install -r dependencies.txt
+
+## 3) Test/Run
+python AlarmApp.py --test
