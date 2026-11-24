@@ -274,8 +274,8 @@ def pose_double_bi(result, display):
     if "--debug" in sys.argv:
         put_text(display, f"angles: {angle_right_arm:.0f} {angle_left_arm:.0f}", 50, x=200)
     
-    is_left_flex = (30 < angle_left_arm < 100) and (lm[LEFT_WRIST].y < lm[LEFT_SHOULDER].y)
-    is_right_flex = (30 < angle_right_arm < 100) and (lm[RIGHT_WRIST].y < lm[RIGHT_SHOULDER].y)
+    is_left_flex = (30 < angle_left_arm < 110) and (lm[LEFT_WRIST].y < lm[LEFT_SHOULDER].y)
+    is_right_flex = (30 < angle_right_arm < 110) and (lm[RIGHT_WRIST].y < lm[RIGHT_SHOULDER].y)
     
     return is_left_flex and is_right_flex
     
