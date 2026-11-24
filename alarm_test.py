@@ -2,8 +2,8 @@
 Resisting Alarm Clock
 State machine: IDLE -> RINGING -> EXERCISING -> DONE
 
-Run normally:   python AlarmApp.py          (uses ALARM_TIME below)
-Quick test:     python AlarmApp.py --test   (alarm goes off in 5 seconds)
+Run normally:   python alarm_test.py          (uses ALARM_TIME below)
+Quick test:     python alarm_test.py --test   (alarm goes off in 5 seconds)
 """
 
 import os
