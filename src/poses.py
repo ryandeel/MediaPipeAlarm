@@ -11,6 +11,7 @@ from utils import calcul_angle, put_text
 
 class Pose(Enum):
     DOUBLE_BI = 1
+    HANDS_UP = 2
 
 
 @dataclass
@@ -44,9 +45,19 @@ def pose_double_bi(result, display):
     return is_left_flex and is_right_flex
 
 
+# ported from avery's hands_above_head_pose on main
+def pose_hands_up(result, display):
+    if not result.pose_landmarks:
+        return False
+
+    lm = result.pose_landmarks[0]
+    return lm[LEFT_WRIST].y < lm[NOSE].y and lm[RIGHT_WRIST].y < lm[NOSE].y
+
+
 # registry: alarm_app looks up everything it needs about a pose here
 #   detect -> function(result, display) that returns True while the user is in the pose
 #   image  -> reference picture shown in the corner (file in the repo root), or None
 POSES = {
     Pose.DOUBLE_BI: PoseInfo(detect=pose_double_bi, image="pose_double_bi.jpg"),
+    Pose.HANDS_UP: PoseInfo(detect=pose_hands_up),
 }
