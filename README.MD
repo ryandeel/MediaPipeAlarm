@@ -53,7 +53,9 @@ A full-screen window opens with a clock and a box for the alarm time.
 3. Leave the window open. When the time comes, the alarm sounds and the camera video appears in the same window under a flashing **WAKE UP!** banner.
 4. Do the challenge shown on screen. Once it's done, the window goes back to the start screen and says **Alarm off. Good morning!**, ready for the next alarm.
 
-Once the alarm is ringing, **Esc** and the window's **X** button do nothing; finishing the challenge is the only way to turn it off. For testing, start the window with `--debug` and Esc / X will stop it.
+When the alarm goes off, a loading screen shows while the pose model loads and the camera starts (a few seconds), then the video appears.
+
+While the alarm is ringing, **Esc** stops it and takes you back to the start screen (marked **Alarm stopped** rather than completed), and the window's **X** button stops it and closes the window.
 
 The alarm only goes off while the window is open and the computer is awake. Closing the window before it rings cancels the alarm.
 
@@ -61,7 +63,7 @@ The alarm only goes off while the window is open and the computer is awake. Clos
 | Key | What it does |
 |---|---|
 | **F11** | Full screen on/off (the window starts in full screen) |
-| **Esc** | Leave full screen (not while the alarm is ringing) |
+| **Esc** | Stop a ringing alarm; otherwise leave full screen |
 | **Ctrl +** / **Ctrl −** | Bigger / smaller text, **Ctrl 0** resets it |
 | **Tab** / **Shift+Tab** | Move between the time box and buttons |
 | **Enter** or **Space** | Press the highlighted button |
@@ -77,7 +79,7 @@ python src/alarm_gui.py --challenge toe_touch --log results.csv --participant p1
 
 - `--challenge NAME` makes every alarm use that challenge instead of a random one: `double_bi`, `hands_up`, `squat`, `toe_touch`, `jumping_jacks`, or `pushups`.
 - `--log FILE.csv --participant NAME` adds one row to the CSV each time an alarm goes off, the same as `alarm_app.py`. The file is saved in the folder you ran the command from.
-- `--debug` shows the debug info and lets Esc / X stop a ringing alarm.
+- `--debug` shows the debug info (angles etc.) on the video.
 
 The time is always set in the window, so don't put a time on the command line. If an option is mistyped, the window shows **Error: bad command-line flag, see the terminal** when the alarm goes off, and the terminal says what was wrong.
 

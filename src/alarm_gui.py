@@ -7,19 +7,21 @@ Run:  python src/alarm_gui.py
 
 Type a time (or click a quick-pick button), press "Set alarm", and leave the window open.
 When the time comes, the normal alarm from alarm_app.py runs (sound + camera + random
-pose/action) and the camera video shows up inside this same window. Once it's ringing,
-Esc and the X button do nothing: the only way to turn it off is the challenge.
-(With --debug, Esc / X still stop it.)
+pose/action) and the camera video shows up inside this same window, after a short
+loading screen while the pose model and camera start up. While it's ringing, Esc stops
+the alarm and the X button stops it and closes the window.
 
 Keyboard:
     F11              full screen on/off (starts in full screen)
-    Esc              leave full screen (when the alarm isn't ringing)
+    Esc              stop a ringing alarm, otherwise leave full screen
     Ctrl + / Ctrl -  bigger / smaller text,  Ctrl 0 resets it
     Tab / Shift+Tab  move between controls, Enter or Space presses the focused button
 
 This file only *uses* alarm_app.py, it doesn't change it, so the challenge logic stays
-in one place. alarm_app.py shows video with cv.imshow / cv.waitKey; while the alarm is
-ringing we temporarily swap those two for versions that draw into this window instead.
+in one place. alarm_app.main() runs in a background thread so this window stays
+responsive (and can animate the loading screen) while it loads the model and camera.
+alarm_app.py shows video with cv.imshow / cv.waitKey; while the alarm is ringing we
+temporarily swap those two for versions that hand frames to this window instead.
 Don't add GUI-only command-line flags: all flags get passed to alarm_app.py, which
 rejects ones it doesn't know.
 
@@ -31,8 +33,10 @@ it like the pose pictures do, so the video keeps its full size.
 
 import os
 import sys
+import time
 import random
 import datetime
+import threading
 import tkinter as tk
 import tkinter.font as tkfont
 
@@ -192,17 +196,23 @@ class AlarmWindow:
         self.action_overlay = None  # how-to picture for actions, drawn onto the video
         self.video_frame = tk.Frame(self.content, bg="black", padx=3, pady=3)
         self.video_label = tk.Label(self.video_frame, bg="black")
-        self.video_label.pack()
+        # loading screen shown in the video's place until the first camera frame arrives
+        self.loading_canvas = tk.Canvas(self.video_frame, bg="black", highlightthickness=0)
 
         # ---- keyboard help, always at the bottom ----
         self.footer = tk.Label(root, bg=BG, fg=MUTED, font=F["footer"],
-                               text="F11  full screen    ·    Ctrl +/−  text size"
+                               text="F11  full screen    ·    Esc  stop alarm    ·    Ctrl +/−  text size"
                                     "    ·    Tab  move    ·    Enter  press")
         self.footer.pack(side="bottom", pady=10)
 
         self.ringing = False
         self.stop_requested = False  # Esc pressed or window closed while ringing
         self.closing = False
+        self.worker = None           # thread running alarm_app.main()
+        self.latest_frame = None     # newest RGB frame from the worker, not yet displayed
+        self.got_first_frame = False
+        self.loading_stage = ""
+        self.spin_angle = 0
         root.bind("<Escape>", lambda e: self.on_escape())
         root.bind("<F11>", lambda e: self.set_fullscreen(not self.is_fullscreen()))
         for key in ("<Control-plus>", "<Control-equal>", "<Control-KP_Add>"):
@@ -237,45 +247,76 @@ class AlarmWindow:
     # ---------------- stopping / closing ----------------
     def on_escape(self):
         if self.ringing:
-            # No quitting a ringing alarm with Esc, except with --debug so testers don't get stuck
-            if "--debug" in sys.argv:
-                self.stop_requested = True
+            self.stop_requested = True  # alarm_app sees Esc on its next frame and stops
         elif self.is_fullscreen():
             self.set_fullscreen(False)
 
     def on_close(self):
         if self.ringing:
-            if "--debug" in sys.argv:
-                # can't destroy the window mid-frame; stop the camera loop first, then close
-                self.closing = True
-                self.stop_requested = True
-            # otherwise ignore the X button: do the challenge to turn the alarm off
+            # alarm_app is still running in the background thread: tell it to stop, and
+            # finish_ring() closes the window once it has released the camera
+            self.closing = True
+            self.stop_requested = True
+            self.set_status("Closing...", MUTED)
         else:
             self.root.destroy()
 
     # ---------------- stand-ins for cv.imshow / cv.waitKey ----------------
+    # These run on the background thread, so they must not touch any Tk widgets.
+    # They just hand the frame / stop flag over; poll_ring() does the drawing.
     def show_frame(self, _window_name, bgr_image):
         if self.action_overlay is not None:
             # action how-to picture, top-right over the video like pose pictures
             overlay_corner(bgr_image, self.action_overlay, alpha=0.75)
-        rgb = cv.cvtColor(bgr_image, cv.COLOR_BGR2RGB)
-        img = Image.fromarray(rgb)
+        self.latest_frame = cv.cvtColor(bgr_image, cv.COLOR_BGR2RGB)
 
-        # make the video as big as fits in the space the other widgets leave over
+    def wait_key(self, _delay=0):
+        time.sleep(0.001)  # give the window's thread a turn
+        return 27 if self.stop_requested else -1  # 27 = Esc, which alarm_app checks for
+
+    def start_sound_hook(self):
+        """alarm_app calls start_sound() right after the model loads and right before it
+        opens the camera, so that's when the loading screen moves to its next step."""
+        self.loading_stage = "Fetching camera"
+        self.real_start_sound()
+
+    # ---------------- video area sizing ----------------
+    def fit_size(self, w, h):
+        """largest (w, h) with this shape that fits in the space the other widgets leave"""
         other_h = self.content.winfo_reqheight() - self.video_frame.winfo_reqheight()
         max_w = self.root.winfo_width() - 60
         max_h = self.root.winfo_height() - other_h - self.footer.winfo_reqheight() - 50
-        fit = min(max_w / img.width, max_h / img.height)
-        if fit > 0 and abs(fit - 1) > 0.02:
-            img = img.resize((max(1, int(img.width * fit)), max(1, int(img.height * fit))))
+        fit = min(max_w / w, max_h / h)
+        if fit <= 0:
+            return w, h
+        return max(1, int(w * fit)), max(1, int(h * fit))
 
+    def draw_frame(self, rgb):
+        img = Image.fromarray(rgb)
+        size = self.fit_size(img.width, img.height)
+        if abs(size[0] - img.width) > 2:
+            img = img.resize(size)
         photo = ImageTk.PhotoImage(img)
         self.video_label.config(image=photo)
         self.video_label.image = photo  # keep a reference or tkinter drops the image
 
-    def wait_key(self, _delay=0):
-        self.root.update()  # keep the window responsive between frames
-        return 27 if self.stop_requested else -1  # 27 = Esc, which alarm_app checks for
+    def draw_loading(self):
+        """spinner + current step, drawn where the video will appear"""
+        c = self.loading_canvas
+        w, h = self.fit_size(640, 480)  # same size the video will be
+        c.config(width=w, height=h)
+        c.delete("all")
+        cx, cy = w // 2, h // 2 - 30
+        r = max(20, min(w, h) // 10)
+        c.create_oval(cx - r, cy - r, cx + r, cy + r, outline=FIELD, width=8)
+        c.create_arc(cx - r, cy - r, cx + r, cy + r, start=self.spin_angle, extent=100,
+                     style="arc", outline=ACCENT, width=8)
+        dots = "." * (1 + (self.spin_angle // 120) % 3)
+        c.create_text(cx, cy + r + 40, text=f"{self.loading_stage}{dots}", fill=TEXT,
+                      font=self.fonts["banner"])
+        steps = "Step 1 of 2" if self.loading_stage.startswith("Loading") else "Step 2 of 2"
+        c.create_text(cx, cy + r + 85, text=steps, fill=MUTED, font=self.fonts["status"])
+        self.spin_angle = (self.spin_angle - 12) % 360
 
     # ---------------- setting the alarm ----------------
     def set_status(self, text, color=MUTED, announce=False):
@@ -397,6 +438,13 @@ class AlarmWindow:
         challenge, extra_args = self.pick_challenge()
         self.show_action_image(challenge)
 
+        # loading screen until the first camera frame arrives
+        self.video_label.pack_forget()
+        self.loading_canvas.pack()
+        self.latest_frame = None
+        self.got_first_frame = False
+        self.loading_stage = "Loading pose model"
+
         # bring the window to the front in case it was minimized or behind other windows
         self.root.deiconify()
         self.root.attributes("-topmost", True)
@@ -406,20 +454,54 @@ class AlarmWindow:
         # Reuse alarm_app's main loop as-is: give it an alarm time of 0 seconds so it
         # rings immediately, and pass along any flags this window was started with
         # (--debug, --challenge, --log, --participant, ...), plus the challenge we picked.
-        saved_argv = sys.argv
-        sys.argv = ["alarm_app.py", "0"] + saved_argv[1:] + extra_args
-        saved_imshow, saved_waitkey = cv.imshow, cv.waitKey
+        self.saved_argv = sys.argv
+        sys.argv = ["alarm_app.py", "0"] + self.saved_argv[1:] + extra_args
+        self.saved_imshow, self.saved_waitkey = cv.imshow, cv.waitKey
         cv.imshow, cv.waitKey = self.show_frame, self.wait_key
-        bad_flags = False
+        self.real_start_sound = alarm_app.start_sound
+        alarm_app.start_sound = self.start_sound_hook
+        self.bad_flags = False
+
+        self.worker = threading.Thread(target=self.run_alarm_app, daemon=True)
+        self.worker.start()
+        self.poll_ring()
+
+    def run_alarm_app(self):
+        """background thread: the whole alarm_app.main() run"""
         try:
             alarm_app.main()
         except SystemExit:
-            bad_flags = True  # argparse rejected a flag; it printed why in the terminal
+            self.bad_flags = True  # argparse rejected a flag; it printed why in the terminal
+        except Exception as e:
+            print(f"alarm_app stopped with an error: {e!r}")
         finally:
-            sys.argv = saved_argv
-            cv.imshow, cv.waitKey = saved_imshow, saved_waitkey
-            alarm_app.stop_sound()  # in case it was stopped with Esc
-            self.ringing = False
+            alarm_app.stop_sound()  # in case it was stopped with Esc / X
+
+    def poll_ring(self):
+        """window thread, ~25 times a second while ringing: draw the newest frame or the
+        loading screen, and notice when alarm_app has finished"""
+        if not self.worker.is_alive():
+            self.finish_ring()
+            return
+
+        frame, self.latest_frame = self.latest_frame, None
+        if frame is not None:
+            if not self.got_first_frame:
+                self.got_first_frame = True
+                self.loading_canvas.pack_forget()
+                self.video_label.pack()
+            self.draw_frame(frame)
+        elif not self.got_first_frame:
+            self.draw_loading()
+
+        self.root.after(40, self.poll_ring)
+
+    def finish_ring(self):
+        sys.argv = self.saved_argv
+        cv.imshow, cv.waitKey = self.saved_imshow, self.saved_waitkey
+        alarm_app.start_sound = self.real_start_sound
+        self.ringing = False
+        stopped_early = self.stop_requested
 
         if self.closing:
             self.root.destroy()
@@ -429,6 +511,7 @@ class AlarmWindow:
         self.banner.pack_forget()
         self.action_overlay = None
         self.video_frame.pack_forget()
+        self.loading_canvas.pack_forget()
         self.video_label.config(image="")
         self.video_label.image = None
         self.status_label.pack_forget()
@@ -436,9 +519,11 @@ class AlarmWindow:
         self.status_label.pack(padx=24, pady=(4, 10))
 
         self.cancel_alarm()
-        if bad_flags:
+        if self.bad_flags:
             self.set_status("Error: bad command-line flag, see the terminal", DANGER,
                             announce=True)
+        elif stopped_early:
+            self.set_status("Alarm stopped", MUTED, announce=True)
         else:
             self.set_status("✔  Alarm off. Good morning!", SUCCESS, announce=True)
 
