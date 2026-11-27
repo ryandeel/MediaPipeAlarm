@@ -88,6 +88,7 @@ TITLE = "Resisting Alarm Clock"
 ACTION_IMAGES = {
     "jumping_jacks": "images/jumping_jack.jpg",
     "pushups": "images/pushup.webp",
+    "squats": "images/squat.jpg"
 }
 ACTION_IMAGE_SIZE = 200     # longest side in pixels, same box as pose pictures
 
