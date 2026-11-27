@@ -38,7 +38,6 @@ import time
 import wave
 import datetime
 import winsound  # built into Windows
-from enum import Enum
 import random
 import argparse
 import re
@@ -52,6 +51,7 @@ from mediapipe.tasks.python.vision import drawing_utils, drawing_styles
 from landmarks import *
 from utils import calcul_angle, put_text, overlay_corner
 from poses import Pose, pose_double_bi
+from actions import Action, action_jumping_jacks
 
 # seed randomizer
 random.seed()
@@ -66,12 +66,6 @@ MODEL_PATH = os.path.join(BASE_DIR, "models", "pose_landmarker_heavy.task")
 SOUND_PATH = os.path.join(BASE_DIR, "alarm.wav")
 DOUBLE_BI_POSE_IMG = cv.imread(os.path.join(BASE_DIR, "pose_double_bi.jpg"))
 DOUBLE_BI_POSE_IMG = cv.resize(DOUBLE_BI_POSE_IMG, (200, 200))
-
-# enums
-class Action(Enum):
-    JUMPING_JACKS = 1
-    # CLAP = 2
-    # SQUATS = 3
 
 # states
 IDLE, RINGING, POSE, ACTION, DONE = "IDLE", "RINGING", "POSE", "ACTION", "DONE"
@@ -219,31 +213,6 @@ def draw_landmarks_on_image(rgb_image, result):
             landmark_drawing_spec=style,
             connection_drawing_spec=conn_style)
     return annotated
-
-def action_jumping_jacks(result, phase):
-    if not result.pose_landmarks:
-        return phase, False
-
-    lm = result.pose_landmarks[0]
-
-    shoulder_w = abs(lm[LEFT_SHOULDER].x - lm[RIGHT_SHOULDER].x)
-    if shoulder_w < 0.01:
-        return phase, False
-
-    shoulder_y = (lm[LEFT_SHOULDER].y + lm[RIGHT_SHOULDER].y) / 2
-
-    # Arms up = wrists above the nose AND elbows above the shoulders
-    # (so you actually have to extend your arms overhead)
-    arms_up = (lm[LEFT_WRIST].y < lm[NOSE].y and lm[RIGHT_WRIST].y < lm[NOSE].y and
-               lm[LEFT_ELBOW].y < shoulder_y and lm[RIGHT_ELBOW].y < shoulder_y)
-    arms_down = lm[LEFT_WRIST].y > shoulder_y and lm[RIGHT_WRIST].y > shoulder_y
-
-
-    if phase == "down" and arms_up:
-        return "up", False
-    if phase == "up" and arms_down:
-        return "down", True
-    return phase, False
 
 # functions for alarm sound
 def make_alarm_wav(path):
