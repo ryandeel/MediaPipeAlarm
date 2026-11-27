@@ -48,8 +48,7 @@ import mediapipe as mp
 from mediapipe.tasks.python import vision
 from mediapipe.tasks.python.vision import drawing_utils, drawing_styles
 
-from landmarks import *
-from utils import calcul_angle, put_text, overlay_corner
+from utils import put_text, overlay_corner
 from poses import Pose, POSES
 from actions import Action, ACTIONS
 
