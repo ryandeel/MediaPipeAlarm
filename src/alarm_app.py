@@ -51,7 +51,7 @@ from mediapipe.tasks.python.vision import drawing_utils, drawing_styles
 from landmarks import *
 from utils import calcul_angle, put_text, overlay_corner
 from poses import Pose, pose_double_bi
-from actions import Action, action_jumping_jacks
+from actions import Action, ACTIONS
 
 # seed randomizer
 random.seed()
@@ -126,8 +126,7 @@ def main():
                     start_sound()
                     cap = cv.VideoCapture(0)
                     reps = 0
-                    # needs to be set in case using jumping jacks
-                    phase = "down"
+                    phase = ACTIONS[action].start_phase
                     state = ACTION
                 continue
             
@@ -148,20 +147,20 @@ def main():
             display = cv.cvtColor(draw_landmarks_on_image(rgb, result), cv.COLOR_RGB2BGR)
             
             if state == ACTION:
-                match action:
-                    case Action.JUMPING_JACKS:
-                        phase, rep_done = action_jumping_jacks(result, phase)
-                        if rep_done:
-                            reps += 1
-                            print(f"Rep {reps}/{BASE_REPS}")
-                        if reps >= BASE_REPS:
-                            stop_sound()
-                            state = DONE
-                            done_at = time.monotonic()
-                        put_text(display, f"Jumping jacks: {reps}/{BASE_REPS}", 50)
-                        if not result.pose_landmarks:
-                            put_text(display, "Step back or find a more well-lit room", 100, 0.8, (0, 0, 255))
-                    
+                # works for every action in the ACTIONS registry
+                info = ACTIONS[action]
+                phase, rep_done = info.detect(result, phase)
+                if rep_done:
+                    reps += 1
+                    print(f"Rep {reps}/{BASE_REPS}")
+                if reps >= BASE_REPS:
+                    stop_sound()
+                    state = DONE
+                    done_at = time.monotonic()
+                put_text(display, f"{info.label}: {reps}/{BASE_REPS}", 50)
+                if not result.pose_landmarks:
+                    put_text(display, "Step back or find a more well-lit room", 100, 0.8, (0, 0, 255))
+
             if state == POSE:
                 match pose:
                     case Pose.DOUBLE_BI:
