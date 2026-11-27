@@ -40,6 +40,49 @@ With no time given, the alarm goes off after 5 seconds.
 - Before the alarm rings, press **Ctrl+C** in the terminal to cancel it.
 - While it's ringing, **Esc** closes the camera window.
 
+## Window version (GUI)
+If you'd rather set the alarm on screen than type it in the terminal, run:
+```
+python src/alarm_gui.py
+```
+
+A full-screen window opens with a clock and a box for the alarm time.
+
+1. Type a time in the box (same formats as the table above: `7:30am`, `6pm`, `10m`, `45s`...) and press **Set alarm** or **Enter**. You can also click one of the quick buttons: `10s`, `1m`, `5m`, `30m`, `7:00am`.
+2. The window counts down to the alarm. Press **Cancel** to clear it.
+3. Leave the window open. When the time comes, the alarm sounds and the camera video appears in the same window under a flashing **WAKE UP!** banner.
+4. Do the challenge shown on screen. Once it's done, the window goes back to the start screen and says **Alarm off. Good morning!**, ready for the next alarm.
+
+Once the alarm is ringing, **Esc** and the window's **X** button do nothing; finishing the challenge is the only way to turn it off. For testing, start the window with `--debug` and Esc / X will stop it.
+
+The alarm only goes off while the window is open and the computer is awake. Closing the window before it rings cancels the alarm.
+
+### Keyboard
+| Key | What it does |
+|---|---|
+| **F11** | Full screen on/off (the window starts in full screen) |
+| **Esc** | Leave full screen (not while the alarm is ringing) |
+| **Ctrl +** / **Ctrl −** | Bigger / smaller text, **Ctrl 0** resets it |
+| **Tab** / **Shift+Tab** | Move between the time box and buttons |
+| **Enter** or **Space** | Press the highlighted button |
+
+### Picking a challenge and logging from the window
+Every option from [Running the evaluation](#running-the-evaluation) works with the window too. Add it when you start the window and it applies to every alarm you set from it:
+
+```
+python src/alarm_gui.py --challenge pushups
+python src/alarm_gui.py --log results.csv --participant p1
+python src/alarm_gui.py --challenge toe_touch --log results.csv --participant p1
+```
+
+- `--challenge NAME` makes every alarm use that challenge instead of a random one: `double_bi`, `hands_up`, `squat`, `toe_touch`, `jumping_jacks`, or `pushups`.
+- `--log FILE.csv --participant NAME` adds one row to the CSV each time an alarm goes off, the same as `alarm_app.py`. The file is saved in the folder you ran the command from.
+- `--debug` shows the debug info and lets Esc / X stop a ringing alarm.
+
+The time is always set in the window, so don't put a time on the command line. If an option is mistyped, the window shows **Error: bad command-line flag, see the terminal** when the alarm goes off, and the terminal says what was wrong.
+
+For testing several people in a row, keep the window open and set a short alarm (for example `10s`) for each run, changing `--participant` by restarting the window between people.
+
 ## Turning the alarm off
 When the alarm rings, the app randomly picks one challenge:
 
@@ -80,6 +123,7 @@ python src/summarize_log.py results.csv
 ```
 src/
   alarm_app.py   main program: alarm time, sound, camera loop
+  alarm_gui.py   window version: set the alarm on screen, runs alarm_app.py inside the window
   poses.py       pose challenges (double bicep, hands above head, squat, toe touch)
   actions.py     rep-counted challenges (jumping jacks, pushups)
   landmarks.py   MediaPipe body point numbers
