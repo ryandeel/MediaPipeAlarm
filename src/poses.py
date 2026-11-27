@@ -22,8 +22,7 @@ from utils import calcul_angle, put_text
 class Pose(Enum):
     DOUBLE_BI = 1
     HANDS_UP = 2
-    SQUAT = 3
-    TOE_TOUCH = 4
+    TOE_TOUCH = 3
 
 
 @dataclass
@@ -31,6 +30,8 @@ class PoseInfo:
     detect: Callable
     image: Optional[str] = None
 
+TOE_TOUCH_MIN_KNEE_ANGLE = 140  # legs have to stay mostly straight
+MIN_LEG_VISIBILITY = 0.5    # 0-1 score from mediapipe for how sure it is the point is on camera
 
 def pose_double_bi(result, display):
     if not result.pose_landmarks:
@@ -66,45 +67,6 @@ def pose_hands_up(result, display):
     return lm[LEFT_WRIST].y < lm[NOSE].y and lm[RIGHT_WRIST].y < lm[NOSE].y
 
 
-SQUAT_MAX_KNEE_ANGLE = 120  # standing straight is ~175 degrees
-MIN_LEG_VISIBILITY = 0.5    # 0-1 score from mediapipe for how sure it is the point is on camera
-
-def pose_squat(result, display):
-    if not result.pose_landmarks:
-        return False
-
-    lm = result.pose_landmarks[0]
-
-    # make sure they aren't facing sideways
-    shoulder_w = abs(lm[LEFT_SHOULDER].x - lm[RIGHT_SHOULDER].x)
-    if shoulder_w < 0.01:
-        return False
-
-    # mediapipe guesses where the legs are even when they're off camera,
-    # so only trust the angles if the hips, knees and ankles are really visible
-    leg_points = (LEFT_HIP, RIGHT_HIP, LEFT_KNEE, RIGHT_KNEE, LEFT_ANKLE, RIGHT_ANKLE)
-    if min(lm[i].visibility for i in leg_points) < MIN_LEG_VISIBILITY:
-        put_text(display, "Step back so your legs are visible", 150, 0.8, (0, 0, 255))
-        return False
-
-    # get angle of left leg
-    angle_left_leg = calcul_angle(lm[LEFT_HIP].x, lm[LEFT_HIP].y, lm[LEFT_KNEE].x, lm[LEFT_KNEE].y, lm[LEFT_ANKLE].x, lm[LEFT_ANKLE].y)
-    # get angle of right leg
-    angle_right_leg = calcul_angle(lm[RIGHT_HIP].x, lm[RIGHT_HIP].y, lm[RIGHT_KNEE].x, lm[RIGHT_KNEE].y, lm[RIGHT_ANKLE].x, lm[RIGHT_ANKLE].y)
-
-    if "--debug" in sys.argv:
-        put_text(display, f"angles: {angle_right_leg:.0f} {angle_left_leg:.0f}", 50, x=200)
-
-    # knees bent past SQUAT_MAX_KNEE_ANGLE counts as a squat; no lower limit
-    # so deep squats (hips at or below the knees) still count
-    is_left_squat = angle_left_leg < SQUAT_MAX_KNEE_ANGLE
-    is_right_squat = angle_right_leg < SQUAT_MAX_KNEE_ANGLE
-
-    return is_left_squat and is_right_squat
-
-
-TOE_TOUCH_MIN_KNEE_ANGLE = 140  # legs have to stay mostly straight
-
 def pose_toe_touch(result, display):
     if not result.pose_landmarks:
         return False
@@ -138,6 +100,5 @@ def pose_toe_touch(result, display):
 POSES = {
     Pose.DOUBLE_BI: PoseInfo(detect=pose_double_bi, image="images/double_bi.png"),
     Pose.HANDS_UP: PoseInfo(detect=pose_hands_up, image="images/hands_up.webp"),
-    Pose.SQUAT: PoseInfo(detect=pose_squat, image="images/squat.jpg"),
     Pose.TOE_TOUCH: PoseInfo(detect=pose_toe_touch, image="images/touching_toes.jpg"),
 }

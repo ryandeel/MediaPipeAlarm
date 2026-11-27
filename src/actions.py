@@ -11,6 +11,8 @@
 
 from dataclasses import dataclass
 from enum import Enum
+import sys
+from utils import put_text, calcul_angle
 from typing import Any, Callable
 import math
 from landmarks import *
@@ -19,7 +21,7 @@ from landmarks import *
 class Action(Enum):
     JUMPING_JACKS = 1
     PUSHUPS = 2
-
+    SQUATS = 3
 
 @dataclass
 class ActionInfo:
@@ -27,6 +29,8 @@ class ActionInfo:
     label: str
     start_phase: Any = None
 
+SQUAT_MAX_KNEE_ANGLE = 120  # standing straight is ~175 degrees
+MIN_LEG_VISIBILITY = 0.5    # 0-1 score from mediapipe for how sure it is the point is on camera
 
 def action_jumping_jacks(result, phase):
     if not result.pose_landmarks:
@@ -94,6 +98,36 @@ def action_pushups(result, phase):
         return "up", True
     return phase, False
 
+def action_squats(result, phase):
+    if not result.pose_landmarks:
+        return phase, False
+
+    lm = result.pose_landmarks[0]
+
+    # make sure they aren't facing sideways
+    shoulder_w = abs(lm[LEFT_SHOULDER].x - lm[RIGHT_SHOULDER].x)
+    if shoulder_w < 0.01:
+        return phase, False
+
+    # mediapipe guesses where the legs are even when they're off camera,
+    # so only trust the angles if the hips, knees and ankles are really visible
+    leg_points = (LEFT_HIP, RIGHT_HIP, LEFT_KNEE, RIGHT_KNEE, LEFT_ANKLE, RIGHT_ANKLE)
+    if min(lm[i].visibility for i in leg_points) < MIN_LEG_VISIBILITY:
+        return phase, False
+
+    # get angle of left leg
+    angle_left_leg = calcul_angle(lm[LEFT_HIP].x, lm[LEFT_HIP].y, lm[LEFT_KNEE].x, lm[LEFT_KNEE].y, lm[LEFT_ANKLE].x, lm[LEFT_ANKLE].y)
+    # get angle of right leg
+    angle_right_leg = calcul_angle(lm[RIGHT_HIP].x, lm[RIGHT_HIP].y, lm[RIGHT_KNEE].x, lm[RIGHT_KNEE].y, lm[RIGHT_ANKLE].x, lm[RIGHT_ANKLE].y)
+
+    # knees bent past SQUAT_MAX_KNEE_ANGLE counts as a squat; no lower limit
+    # so deep squats (hips at or below the knees) still count
+
+    if phase == "up" and ((angle_left_leg < SQUAT_MAX_KNEE_ANGLE) and (angle_right_leg < SQUAT_MAX_KNEE_ANGLE)):
+        return "down", False
+    if phase == "down" and ((angle_left_leg > SQUAT_MAX_KNEE_ANGLE) and (angle_right_leg > SQUAT_MAX_KNEE_ANGLE)):
+        return "up", True
+    return phase, False
 
 # registry: alarm_app looks up everything it needs about an action here
 #   detect      -> function(result, phase) that returns (new_phase, rep_done)
@@ -102,4 +136,5 @@ def action_pushups(result, phase):
 ACTIONS = {
     Action.JUMPING_JACKS: ActionInfo(detect=action_jumping_jacks, label="Jumping jacks", start_phase="down"),
     Action.PUSHUPS: ActionInfo(detect=action_pushups, label="Pushups", start_phase="up"),
+    Action.SQUATS: ActionInfo(detect=action_squats, label="Squats", start_phase="up"),
 }
