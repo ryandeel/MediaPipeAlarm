@@ -1,7 +1,9 @@
 # poses: positions the user has to hold for a few seconds to turn the alarm off
 
 import sys
+from dataclasses import dataclass
 from enum import Enum
+from typing import Callable, Optional
 
 from landmarks import *
 from utils import calcul_angle, put_text
@@ -9,6 +11,12 @@ from utils import calcul_angle, put_text
 
 class Pose(Enum):
     DOUBLE_BI = 1
+
+
+@dataclass
+class PoseInfo:
+    detect: Callable
+    image: Optional[str] = None
 
 
 def pose_double_bi(result, display):
@@ -34,3 +42,11 @@ def pose_double_bi(result, display):
     is_right_flex = (30 < angle_right_arm < 110) and (lm[RIGHT_WRIST].y < lm[RIGHT_SHOULDER].y)
 
     return is_left_flex and is_right_flex
+
+
+# registry: alarm_app looks up everything it needs about a pose here
+#   detect -> function(result, display) that returns True while the user is in the pose
+#   image  -> reference picture shown in the corner (file in the repo root), or None
+POSES = {
+    Pose.DOUBLE_BI: PoseInfo(detect=pose_double_bi, image="pose_double_bi.jpg"),
+}
