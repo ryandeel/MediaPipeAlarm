@@ -6,7 +6,7 @@
 #      the user is in the pose (result.pose_landmarks[0] has the landmarks,
 #      use the constants from landmarks.py to index it)
 #   3. add one line to POSES at the bottom: Pose.T_POSE: PoseInfo(detect=pose_t_pose)
-#      optionally pass image="some_picture.jpg" (in the repo root) to show a
+#      optionally pass image="images/some_picture.jpg" (path from the repo root) to show a
 #      reference picture in the corner
 # the hold timer, on-screen text and turning the alarm off are handled for you
 
@@ -134,10 +134,10 @@ def pose_toe_touch(result, display):
 
 # registry: alarm_app looks up everything it needs about a pose here
 #   detect -> function(result, display) that returns True while the user is in the pose
-#   image  -> reference picture shown in the corner (file in the repo root), or None
+#   image  -> reference picture shown in the corner (path from the repo root), or None
 POSES = {
-    Pose.DOUBLE_BI: PoseInfo(detect=pose_double_bi, image="pose_double_bi.jpg"),
-    Pose.HANDS_UP: PoseInfo(detect=pose_hands_up),
-    Pose.SQUAT: PoseInfo(detect=pose_squat),
-    Pose.TOE_TOUCH: PoseInfo(detect=pose_toe_touch),
+    Pose.DOUBLE_BI: PoseInfo(detect=pose_double_bi, image="images/double_bi.png"),
+    Pose.HANDS_UP: PoseInfo(detect=pose_hands_up, image="images/hands_up.webp"),
+    Pose.SQUAT: PoseInfo(detect=pose_squat, image="images/squat.jpg"),
+    Pose.TOE_TOUCH: PoseInfo(detect=pose_toe_touch, image="images/touching_toes.jpg"),
 }

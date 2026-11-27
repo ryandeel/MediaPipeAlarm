@@ -25,7 +25,8 @@ rejects ones it doesn't know.
 
 Action pictures: alarm_app picks its challenge in a local variable the GUI can't see, so
 the GUI picks the challenge itself and hands it over with --challenge. That lets it show
-the matching picture from ACTION_IMAGES above the video.
+the matching picture from ACTION_IMAGES in the top-right corner of the video, overlapping
+it like the pose pictures do, so the video keeps its full size.
 """
 
 import os
@@ -39,6 +40,7 @@ import cv2 as cv
 from PIL import Image, ImageTk
 
 import alarm_app
+from utils import overlay_corner
 
 # ---------------- look ----------------
 # all text colors are at least 4.5:1 contrast against the background they sit on
@@ -77,19 +79,17 @@ TEXT_SCALES = [0.8, 0.9, 1.0, 1.15, 1.3, 1.5, 1.75, 2.0]
 QUICK_PICKS = ["10s", "1m", "5m", "30m", "7:00am"]
 TITLE = "Resisting Alarm Clock"
 
-# challenge name (lowercase enum name, same as --challenge) -> picture shown above the video.
+# challenge name (lowercase enum name, same as --challenge) -> picture overlaid on the video's
+# top-right corner.
 # Paths are relative to the project root (the folder that holds src/ and models/).
-# Poses are left out on purpose: alarm_app already draws a pose's picture inside the video.
-# To add one: put the file in images/ and add a line whose key matches the Action enum name.
+# Poses are left out on purpose: their pictures are set in poses.py (POSES[...].image) and
+# alarm_app draws them in the corner of the video, so listing them here would show them twice.
+# To add one: put the file in images/ and add a line whose key is the lowercase Action name.
 ACTION_IMAGES = {
-    "JUMPING_JACKS": "images/jumping_jack.jpg",
-    "PUSHUPS": "images/pushup.webp",
-    "SQUATS": "images/squat.jpg",                # used once SQUATS is enabled
-    "TOE_TOUCH": "images/touching_toes.jpg", # key must match the enum name exactly
-    "DOUBLE_BI": "images/double_bi.png",
-    "HANDS_UP": "images/hands_up.webp",
+    "jumping_jacks": "images/jumping_jack.jpg",
+    "pushups": "images/pushup.webp",
 }
-ACTION_IMAGE_HEIGHT = 140   # pixels; lower this if the video gets too small
+ACTION_IMAGE_SIZE = 200     # longest side in pixels, same box as pose pictures
 
 
 def fmt_time(dt, seconds=True):
@@ -188,8 +188,7 @@ class AlarmWindow:
         # ---- ringing view (hidden until the alarm goes off) ----
         self.banner = tk.Label(self.content, text="WAKE UP!", bg=DANGER_BG, fg="white",
                                font=F["banner"], pady=6)
-        self.action_image_label = tk.Label(self.content, bg=BG)  # how-to picture for actions
-        self.action_photo = None
+        self.action_overlay = None  # how-to picture for actions, drawn onto the video
         self.video_frame = tk.Frame(self.content, bg="black", padx=3, pady=3)
         self.video_label = tk.Label(self.video_frame, bg="black")
         self.video_label.pack()
@@ -255,6 +254,9 @@ class AlarmWindow:
 
     # ---------------- stand-ins for cv.imshow / cv.waitKey ----------------
     def show_frame(self, _window_name, bgr_image):
+        if self.action_overlay is not None:
+            # action how-to picture, top-right over the video like pose pictures
+            overlay_corner(bgr_image, self.action_overlay, alpha=0.75)
         rgb = cv.cvtColor(bgr_image, cv.COLOR_BGR2RGB)
         img = Image.fromarray(rgb)
 
@@ -351,23 +353,20 @@ class AlarmWindow:
         return name, ["--challenge", name]
 
     def show_action_image(self, challenge):
-        """Show the how-to picture for an action, or nothing if it has none."""
-        self.action_image_label.pack_forget()
-        self.action_photo = None
-        rel_path = ACTION_IMAGES.get(challenge)
+        """Load the how-to picture for an action; show_frame overlays it on the video's
+        top-right corner, the same way alarm_app does for poses. None if it has none."""
+        self.action_overlay = None
+        rel_path = ACTION_IMAGES.get(challenge.lower())
         if rel_path is None:
             return
-        try:
-            img = Image.open(os.path.join(alarm_app.BASE_DIR, rel_path))
-            scale = ACTION_IMAGE_HEIGHT / img.height
-            img = img.resize((max(1, int(img.width * scale)), ACTION_IMAGE_HEIGHT))
-            self.action_photo = ImageTk.PhotoImage(img)  # keep a reference or Tk drops it
-            self.action_image_label.config(image=self.action_photo)
-            self.action_image_label.pack(before=self.video_frame, pady=(0, 8))
-            self.root.update_idletasks()  # so show_frame sizes the video around it
-        except Exception as e:
+        img = cv.imread(os.path.join(alarm_app.BASE_DIR, rel_path))
+        if img is None:
             # a bad filename must never stop the alarm from being turned off
-            print(f"Warning: couldn't show action image {rel_path!r}: {e}")
+            print(f"Warning: couldn't load action image {rel_path!r}")
+            return
+        # fit inside the same 200x200 box as pose pictures, keeping its shape
+        fit = ACTION_IMAGE_SIZE / max(img.shape[:2])
+        self.action_overlay = cv.resize(img, (round(img.shape[1] * fit), round(img.shape[0] * fit)))
 
     # ---------------- ringing ----------------
     def blink_banner(self, on=True):
@@ -427,8 +426,7 @@ class AlarmWindow:
 
         # back to the setup view
         self.banner.pack_forget()
-        self.action_image_label.pack_forget()
-        self.action_photo = None
+        self.action_overlay = None
         self.video_frame.pack_forget()
         self.video_label.config(image="")
         self.video_label.image = None
