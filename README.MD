@@ -49,12 +49,13 @@ When the alarm rings, the app randomly picks one challenge:
 | Hands above head | Raise both hands above your head and hold for 5 seconds |
 | Squat | Bend both knees into a squat and hold for 5 seconds |
 | Jumping jacks | Do 5 jumping jacks, bringing your arms all the way up and back down each time |
+| Pushups | Do 5 pushups, side-on to the camera, going down until your elbows bend past 100 degrees and back up |
 
-Holding a pose for 5 seconds means holding it the whole time; dropping out of it restarts the timer. Stand far enough back that the camera can see your upper body, or your whole body for squats, in a well-lit room.
+Holding a pose for 5 seconds means holding it the whole time; dropping out of it restarts the timer. Stand far enough back that the camera can see your upper body, or your whole body for squats, in a well-lit room. For pushups, put the camera on the floor so it sees you from the side.
 
 ## Running the evaluation
 Two options make testing easier:
-- `--challenge NAME` always uses that challenge instead of a random one: `double_bi`, `hands_up`, `squat`, or `jumping_jacks`
+- `--challenge NAME` always uses that challenge instead of a random one: `double_bi`, `hands_up`, `squat`, `jumping_jacks`, or `pushups`
 - `--log FILE.csv --participant NAME` adds a row to a CSV after each alarm (challenge, completed/quit, seconds to finish, reps counted, how often a person was detected)
 
 **Accuracy test.** For each person and each challenge, run:
