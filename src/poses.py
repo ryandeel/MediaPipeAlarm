@@ -1,4 +1,14 @@
 # poses: positions the user has to hold for a few seconds to turn the alarm off
+#
+# HOW TO ADD A POSE (alarm_app.py doesn't need to change):
+#   1. add a value to the Pose enum, e.g. T_POSE = 3
+#   2. write a function pose_<name>(result, display) that returns True while
+#      the user is in the pose (result.pose_landmarks[0] has the landmarks,
+#      use the constants from landmarks.py to index it)
+#   3. add one line to POSES at the bottom: Pose.T_POSE: PoseInfo(detect=pose_t_pose)
+#      optionally pass image="some_picture.jpg" (in the repo root) to show a
+#      reference picture in the corner
+# the hold timer, on-screen text and turning the alarm off are handled for you
 
 import sys
 from dataclasses import dataclass

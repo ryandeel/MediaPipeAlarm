@@ -9,7 +9,8 @@ the debug stuff will stay here in development but will never reach main branch, 
 when we are done with coding this and we push to main, please do not push this comment block
 and the debug flags, leave it in the dev branch though because its important dev tools
 
-enums for poses and actions are below constants, feel free to move around or change
+enums for poses and actions now live in src/poses.py and src/actions.py (see the top of
+each file for how to add a new one), feel free to move around or change
 non-implemented poses and actions as you see fit, but please don't mess with the enums
 for already implemented poses and actions
 """

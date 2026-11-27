@@ -1,4 +1,13 @@
 # actions: movements the user has to do a number of reps of to turn the alarm off
+#
+# HOW TO ADD AN ACTION (alarm_app.py doesn't need to change):
+#   1. add a value to the Action enum, e.g. SQUATS = 3
+#   2. write a function action_<name>(result, phase) that returns (new_phase, rep_done)
+#      - phase is whatever you need to remember between frames ("up"/"down" etc.)
+#      - rep_done is True on the one frame a rep finishes
+#   3. add one line to ACTIONS at the bottom:
+#      Action.SQUATS: ActionInfo(detect=action_squats, label="Squats", start_phase="up")
+# the rep counter, on-screen text and turning the alarm off are handled for you
 
 from dataclasses import dataclass
 from enum import Enum
