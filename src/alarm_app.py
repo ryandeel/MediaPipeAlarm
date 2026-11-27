@@ -42,6 +42,7 @@ import winsound  # built into Windows
 import random
 import argparse
 import re
+import csv
 
 import cv2 as cv
 import numpy as np
@@ -97,6 +98,10 @@ def main():
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--challenge", choices=sorted(CHALLENGES),
                         help="always use this challenge instead of a random one (for testing)")
+    parser.add_argument("--log", metavar="FILE.csv",
+                        help="append a row with this run's results to a CSV file (for testing)")
+    parser.add_argument("--participant", default="",
+                        help="name or ID of the person being tested, saved in the --log file")
     args = parser.parse_args()
 
     try:
@@ -123,6 +128,14 @@ def main():
         else:
             action, action_or_pose = picked, 1
 
+    # stats for --log
+    rang_at = None           # wall clock time the alarm went off
+    first_frame_at = None    # when the first camera frame arrived
+    frames = 0
+    frames_with_person = 0
+    camera_failed = False
+    quit_pressed = False
+
     try:
         while True:
             # idle state: wait for the alarm time
@@ -135,6 +148,7 @@ def main():
             
             # ringing state: start alarm and open camera
             if state == RINGING:
+                rang_at = datetime.datetime.now()
                 if action_or_pose == 0:
                     print("WAKE UP! Strike a pose to turn it off.")
                     start_sound()
@@ -155,8 +169,12 @@ def main():
             success, frame = cap.read()
             if not success:
                 print("Camera failed to read a frame.")
+                camera_failed = True
                 break
-            
+            if first_frame_at is None:
+                first_frame_at = time.monotonic()
+            frames += 1
+
             frame = cv.flip(frame, 1)
             rgb = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
             
@@ -164,7 +182,9 @@ def main():
             # 30 fps
             frame_timestamp_ms += 33
             result = pose_landmarker.detect_for_video(mp_image, frame_timestamp_ms)
-            
+            if result.pose_landmarks:
+                frames_with_person += 1
+
             display = cv.cvtColor(draw_landmarks_on_image(rgb, result), cv.COLOR_RGB2BGR)
             
             if state == ACTION:
@@ -213,12 +233,57 @@ def main():
             
             cv.imshow("alarm", display)
             if cv.waitKey(1) & 0xFF == 27:
+                quit_pressed = True
                 break
-            
+
     finally:
         if cap is not None:
             cap.release()
         cv.destroyAllWindows()
+
+        # only log runs where the alarm actually went off
+        if args.log and rang_at is not None:
+            if done_at is not None:
+                outcome = "completed"
+            elif camera_failed:
+                outcome = "camera_failed"
+            elif quit_pressed:
+                outcome = "quit"
+            else:
+                outcome = "interrupted"
+            is_pose = action_or_pose == 0
+            elapsed = time.monotonic() - first_frame_at if first_frame_at else 0
+            append_log(args.log, {
+                "timestamp": rang_at.strftime("%Y-%m-%d %H:%M:%S"),
+                "participant": args.participant,
+                "challenge": (pose if is_pose else action).name.lower(),
+                "type": "pose" if is_pose else "action",
+                "result": outcome,
+                "seconds_to_finish": f"{done_at - first_frame_at:.1f}" if done_at and first_frame_at else "",
+                "reps_counted": "" if is_pose else reps,
+                "goal": f"{BASE_TIME}s hold" if is_pose else f"{BASE_REPS} reps",
+                "frames": frames,
+                "person_detected_pct": f"{100 * frames_with_person / frames:.0f}" if frames else "",
+                "avg_fps": f"{frames / elapsed:.1f}" if elapsed else "",
+                "actual_reps": "",
+                "notes": "",
+            })
+            print(f"Logged this run to {args.log}")
+
+# columns in the --log CSV. actual_reps and notes are left blank for the
+# person running the test to fill in by hand
+LOG_FIELDS = ["timestamp", "participant", "challenge", "type", "result",
+              "seconds_to_finish", "reps_counted", "goal", "frames",
+              "person_detected_pct", "avg_fps", "actual_reps", "notes"]
+
+def append_log(path, row):
+    """add one row to the CSV, writing the header first if the file is new"""
+    is_new = not os.path.exists(path) or os.path.getsize(path) == 0
+    with open(path, "a", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=LOG_FIELDS)
+        if is_new:
+            writer.writeheader()
+        writer.writerow(row)
 
 def draw_landmarks_on_image(rgb_image, result):
     annotated = np.copy(rgb_image)
