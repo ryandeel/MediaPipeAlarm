@@ -50,6 +50,8 @@ import mediapipe as mp
 from mediapipe.tasks.python import vision
 from mediapipe.tasks.python.vision import drawing_utils, drawing_styles
 
+from landmarks import *
+
 # seed randomizer
 random.seed()
 
@@ -63,16 +65,6 @@ MODEL_PATH = os.path.join(BASE_DIR, "models", "pose_landmarker_heavy.task")
 SOUND_PATH = os.path.join(BASE_DIR, "alarm.wav")
 DOUBLE_BI_POSE_IMG = cv.imread(os.path.join(BASE_DIR, "pose_double_bi.jpg"))
 DOUBLE_BI_POSE_IMG = cv.resize(DOUBLE_BI_POSE_IMG, (200, 200))
-
-NOSE = 0
-RIGHT_SHOULDER, LEFT_SHOULDER = 11, 12
-RIGHT_WRIST, LEFT_WRIST = 15, 16
-RIGHT_ANKLE, LEFT_ANKLE = 27, 28
-NOSE = 0
-RIGHT_SHOULDER, LEFT_SHOULDER = 11, 12
-RIGHT_ELBOW, LEFT_ELBOW = 13, 14
-RIGHT_WRIST, LEFT_WRIST = 15, 16
-RIGHT_ANKLE, LEFT_ANKLE = 27, 28
 
 # enums
 class Action(Enum):
