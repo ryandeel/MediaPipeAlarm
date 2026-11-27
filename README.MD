@@ -52,6 +52,28 @@ When the alarm rings, the app randomly picks one challenge:
 
 Holding a pose for 5 seconds means holding it the whole time; dropping out of it restarts the timer. Stand far enough back that the camera can see your upper body, or your whole body for squats, in a well-lit room.
 
+## Running the evaluation
+Two options make testing easier:
+- `--challenge NAME` always uses that challenge instead of a random one: `double_bi`, `hands_up`, `squat`, or `jumping_jacks`
+- `--log FILE.csv --participant NAME` adds a row to a CSV after each alarm (challenge, completed/quit, seconds to finish, reps counted, how often a person was detected)
+
+**Accuracy test.** For each person and each challenge, run:
+```
+python src/alarm_app.py 3 --challenge jumping_jacks --log results.csv --participant p1
+```
+For jumping jacks, someone watching counts how many jumping jacks the person really did before the app reached 5, and types that number into the `actual_reps` column of `results.csv`.
+
+**False trigger test.** Log these to a separate file. Start a pose challenge, have the person move around normally in front of the camera for 30 seconds without doing the pose (walking, sitting, stretching), then press Esc:
+```
+python src/alarm_app.py 3 --challenge double_bi --log false_triggers.csv --participant p1
+```
+Any run marked `completed` turned the alarm off by mistake.
+
+**Results table.** Summarize either file with:
+```
+python src/summarize_log.py results.csv
+```
+
 ## Project layout
 ```
 src/
@@ -60,6 +82,7 @@ src/
   actions.py     rep-counted challenges (jumping jacks)
   landmarks.py   MediaPipe body point numbers
   utils.py       shared helpers (angles, drawing on the video)
+  summarize_log.py  turns a --log CSV into a results table
 models/          MediaPipe pose landmarker model
 ```
 
