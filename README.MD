@@ -48,14 +48,15 @@ When the alarm rings, the app randomly picks one challenge:
 | Double bicep | Flex both arms with your fists above your shoulders and hold for 5 seconds (a reference picture is shown in the corner) |
 | Hands above head | Raise both hands above your head and hold for 5 seconds |
 | Squat | Bend both knees into a squat and hold for 5 seconds |
+| Toe touch | Bend over and reach both hands down past your knees toward your toes, keeping your legs mostly straight, and hold for 5 seconds |
 | Jumping jacks | Do 5 jumping jacks, bringing your arms all the way up and back down each time |
 | Pushups | Do 5 pushups, side-on to the camera, going down until your elbows bend past 100 degrees and back up |
 
-Holding a pose for 5 seconds means holding it the whole time; dropping out of it restarts the timer. Stand far enough back that the camera can see your upper body, or your whole body for squats, in a well-lit room. For pushups, put the camera on the floor so it sees you from the side.
+Holding a pose for 5 seconds means holding it the whole time; dropping out of it restarts the timer. Stand far enough back that the camera can see your upper body, or your whole body for squats and toe touches, in a well-lit room. For pushups, put the camera on the floor so it sees you from the side.
 
 ## Running the evaluation
 Two options make testing easier:
-- `--challenge NAME` always uses that challenge instead of a random one: `double_bi`, `hands_up`, `squat`, `jumping_jacks`, or `pushups`
+- `--challenge NAME` always uses that challenge instead of a random one: `double_bi`, `hands_up`, `squat`, `toe_touch`, `jumping_jacks`, or `pushups`
 - `--log FILE.csv --participant NAME` adds a row to a CSV after each alarm (challenge, completed/quit, seconds to finish, reps counted, how often a person was detected)
 
 **Accuracy test.** For each person and each challenge, run:
@@ -79,8 +80,8 @@ python src/summarize_log.py results.csv
 ```
 src/
   alarm_app.py   main program: alarm time, sound, camera loop
-  poses.py       pose challenges (double bicep, hands above head, squat)
-  actions.py     rep-counted challenges (jumping jacks)
+  poses.py       pose challenges (double bicep, hands above head, squat, toe touch)
+  actions.py     rep-counted challenges (jumping jacks, pushups)
   landmarks.py   MediaPipe body point numbers
   utils.py       shared helpers (angles, drawing on the video)
   summarize_log.py  turns a --log CSV into a results table
