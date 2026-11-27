@@ -22,9 +22,15 @@ in one place. alarm_app.py shows video with cv.imshow / cv.waitKey; while the al
 ringing we temporarily swap those two for versions that draw into this window instead.
 Don't add GUI-only command-line flags: all flags get passed to alarm_app.py, which
 rejects ones it doesn't know.
+
+Action pictures: alarm_app picks its challenge in a local variable the GUI can't see, so
+the GUI picks the challenge itself and hands it over with --challenge. That lets it show
+the matching picture from ACTION_IMAGES above the video.
 """
 
+import os
 import sys
+import random
 import datetime
 import tkinter as tk
 import tkinter.font as tkfont
@@ -70,6 +76,20 @@ TEXT_SCALES = [0.8, 0.9, 1.0, 1.15, 1.3, 1.5, 1.75, 2.0]
 
 QUICK_PICKS = ["10s", "1m", "5m", "30m", "7:00am"]
 TITLE = "Resisting Alarm Clock"
+
+# challenge name (lowercase enum name, same as --challenge) -> picture shown above the video.
+# Paths are relative to the project root (the folder that holds src/ and models/).
+# Poses are left out on purpose: alarm_app already draws a pose's picture inside the video.
+# To add one: put the file in images/ and add a line whose key matches the Action enum name.
+ACTION_IMAGES = {
+    "JUMPING_JACKS": "images/jumping_jack.jpg",
+    "PUSHUPS": "images/pushup.webp",
+    "SQUATS": "images/squat.jpg",                # used once SQUATS is enabled
+    "TOE_TOUCH": "images/touching_toes.jpg", # key must match the enum name exactly
+    "DOUBLE_BI": "images/double_bi.png",
+    "HANDS_UP": "images/hands_up.webp",
+}
+ACTION_IMAGE_HEIGHT = 140   # pixels; lower this if the video gets too small
 
 
 def fmt_time(dt, seconds=True):
@@ -168,6 +188,8 @@ class AlarmWindow:
         # ---- ringing view (hidden until the alarm goes off) ----
         self.banner = tk.Label(self.content, text="WAKE UP!", bg=DANGER_BG, fg="white",
                                font=F["banner"], pady=6)
+        self.action_image_label = tk.Label(self.content, bg=BG)  # how-to picture for actions
+        self.action_photo = None
         self.video_frame = tk.Frame(self.content, bg="black", padx=3, pady=3)
         self.video_label = tk.Label(self.video_frame, bg="black")
         self.video_label.pack()
@@ -314,6 +336,39 @@ class AlarmWindow:
 
         self.root.after(500, self.tick)
 
+    # ---------------- challenge pictures ----------------
+    def pick_challenge(self):
+        """Return (challenge_name, extra_argv). Respects a --challenge the window was started with."""
+        argv = sys.argv[1:]
+        for i, arg in enumerate(argv):
+            if arg == "--challenge" and i + 1 < len(argv):
+                return argv[i + 1], []
+            if arg.startswith("--challenge="):
+                return arg.split("=", 1)[1], []
+        # same odds as alarm_app: coin flip between pose and action, then random within
+        pool = alarm_app.Pose if random.randint(0, 1) == 0 else alarm_app.Action
+        name = random.choice(list(pool)).name.lower()
+        return name, ["--challenge", name]
+
+    def show_action_image(self, challenge):
+        """Show the how-to picture for an action, or nothing if it has none."""
+        self.action_image_label.pack_forget()
+        self.action_photo = None
+        rel_path = ACTION_IMAGES.get(challenge)
+        if rel_path is None:
+            return
+        try:
+            img = Image.open(os.path.join(alarm_app.BASE_DIR, rel_path))
+            scale = ACTION_IMAGE_HEIGHT / img.height
+            img = img.resize((max(1, int(img.width * scale)), ACTION_IMAGE_HEIGHT))
+            self.action_photo = ImageTk.PhotoImage(img)  # keep a reference or Tk drops it
+            self.action_image_label.config(image=self.action_photo)
+            self.action_image_label.pack(before=self.video_frame, pady=(0, 8))
+            self.root.update_idletasks()  # so show_frame sizes the video around it
+        except Exception as e:
+            # a bad filename must never stop the alarm from being turned off
+            print(f"Warning: couldn't show action image {rel_path!r}: {e}")
+
     # ---------------- ringing ----------------
     def blink_banner(self, on=True):
         # slow (under 1 flash per second) and between two similar reds, so it's
@@ -338,6 +393,10 @@ class AlarmWindow:
                         TEXT, announce=True)
         self.blink_banner()
 
+        # decide the challenge here so we can show its picture (must come after video_frame is packed)
+        challenge, extra_args = self.pick_challenge()
+        self.show_action_image(challenge)
+
         # bring the window to the front in case it was minimized or behind other windows
         self.root.deiconify()
         self.root.attributes("-topmost", True)
@@ -346,9 +405,9 @@ class AlarmWindow:
 
         # Reuse alarm_app's main loop as-is: give it an alarm time of 0 seconds so it
         # rings immediately, and pass along any flags this window was started with
-        # (--debug, --challenge, --log, --participant, ...).
+        # (--debug, --challenge, --log, --participant, ...), plus the challenge we picked.
         saved_argv = sys.argv
-        sys.argv = ["alarm_app.py", "0"] + saved_argv[1:]
+        sys.argv = ["alarm_app.py", "0"] + saved_argv[1:] + extra_args
         saved_imshow, saved_waitkey = cv.imshow, cv.waitKey
         cv.imshow, cv.waitKey = self.show_frame, self.wait_key
         bad_flags = False
@@ -368,6 +427,8 @@ class AlarmWindow:
 
         # back to the setup view
         self.banner.pack_forget()
+        self.action_image_label.pack_forget()
+        self.action_photo = None
         self.video_frame.pack_forget()
         self.video_label.config(image="")
         self.video_label.image = None

@@ -18,9 +18,7 @@ from landmarks import *
 
 class Action(Enum):
     JUMPING_JACKS = 1
-    # CLAP = 2
-    # SQUATS = 3
-    PUSHUPS = 4
+    PUSHUPS = 2
 
 
 @dataclass
