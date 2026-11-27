@@ -50,7 +50,7 @@ from mediapipe.tasks.python.vision import drawing_utils, drawing_styles
 
 from landmarks import *
 from utils import calcul_angle, put_text, overlay_corner
-from poses import Pose, POSES, pose_double_bi
+from poses import Pose, POSES
 from actions import Action, ACTIONS
 
 # seed randomizer
@@ -171,31 +171,29 @@ def main():
                     put_text(display, "Step back or find a more well-lit room", 100, 0.8, (0, 0, 255))
 
             if state == POSE:
-                match pose:
-                    case Pose.DOUBLE_BI:
-                        put_text(display, "Strike a pose!", 50)
-                        if pose_img is not None:
-                            overlay_corner(display, pose_img, alpha=0.75)
+                # works for every pose in the POSES registry
+                put_text(display, "Strike a pose!", 50)
+                if pose_img is not None:
+                    overlay_corner(display, pose_img, alpha=0.75)
 
-                        is_in_pose = pose_double_bi(result, display)
-                        if is_in_pose:
-                            if pose_started_at is None:
-                                pose_started_at = time.monotonic()
-                            held = time.monotonic() - pose_started_at
-                            put_text(display, f"Hold it! {held:.1f}/{BASE_TIME}s", 100)
+                is_in_pose = POSES[pose].detect(result, display)
+                if is_in_pose:
+                    if pose_started_at is None:
+                        pose_started_at = time.monotonic()
+                    held = time.monotonic() - pose_started_at
+                    put_text(display, f"Hold it! {held:.1f}/{BASE_TIME}s", 100)
 
-                            if held >= BASE_TIME:
-                                stop_sound()
-                                state = DONE
-                                done_at = time.monotonic()
-                                pose_started_at = None
-                        else:
-                            pose_started_at = None   # broke the pose, restart the timer
+                    if held >= BASE_TIME:
+                        stop_sound()
+                        state = DONE
+                        done_at = time.monotonic()
+                        pose_started_at = None
+                else:
+                    pose_started_at = None   # broke the pose, restart the timer
 
-                        if not result.pose_landmarks:
-                            put_text(display, "Step back or find a more well-lit room", 150, 0.8, (0, 0, 255))
-                                    
-                    
+                if not result.pose_landmarks:
+                    put_text(display, "Step back or find a more well-lit room", 150, 0.8, (0, 0, 255))
+
             elif state == DONE:
                 put_text(display, "Alarm off. Good morning!", 50)
                 if time.monotonic() - done_at > 3:
