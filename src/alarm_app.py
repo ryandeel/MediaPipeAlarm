@@ -50,7 +50,7 @@ from mediapipe.tasks.python.vision import drawing_utils, drawing_styles
 
 from landmarks import *
 from utils import calcul_angle, put_text, overlay_corner
-from poses import Pose, pose_double_bi
+from poses import Pose, POSES, pose_double_bi
 from actions import Action, ACTIONS
 
 # seed randomizer
@@ -64,8 +64,16 @@ FILE_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.dirname(FILE_DIR)
 MODEL_PATH = os.path.join(BASE_DIR, "models", "pose_landmarker_heavy.task")
 SOUND_PATH = os.path.join(BASE_DIR, "alarm.wav")
-DOUBLE_BI_POSE_IMG = cv.imread(os.path.join(BASE_DIR, "pose_double_bi.jpg"))
-DOUBLE_BI_POSE_IMG = cv.resize(DOUBLE_BI_POSE_IMG, (200, 200))
+
+def load_pose_image(filename, size=(200, 200)):
+    """load a reference picture for a pose, or None if it has no picture / file is missing"""
+    if filename is None:
+        return None
+    img = cv.imread(os.path.join(BASE_DIR, filename))
+    if img is None:
+        print(f"Warning: couldn't load pose image {filename!r}")
+        return None
+    return cv.resize(img, size)
 
 # states
 IDLE, RINGING, POSE, ACTION, DONE = "IDLE", "RINGING", "POSE", "ACTION", "DONE"
@@ -120,6 +128,7 @@ def main():
                     start_sound()
                     cap = cv.VideoCapture(0)
                     pose_started_at = None
+                    pose_img = load_pose_image(POSES[pose].image)
                     state = POSE
                 else:
                     print("WAKE UP! Do an action to turn it off.")
@@ -165,7 +174,8 @@ def main():
                 match pose:
                     case Pose.DOUBLE_BI:
                         put_text(display, "Strike a pose!", 50)
-                        overlay_corner(display, DOUBLE_BI_POSE_IMG, alpha=0.75)
+                        if pose_img is not None:
+                            overlay_corner(display, pose_img, alpha=0.75)
 
                         is_in_pose = pose_double_bi(result, display)
                         if is_in_pose:
