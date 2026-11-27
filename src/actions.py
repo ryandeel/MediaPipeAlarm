@@ -1,6 +1,8 @@
 # actions: movements the user has to do a number of reps of to turn the alarm off
 
+from dataclasses import dataclass
 from enum import Enum
+from typing import Any, Callable
 
 from landmarks import *
 
@@ -9,6 +11,13 @@ class Action(Enum):
     JUMPING_JACKS = 1
     # CLAP = 2
     # SQUATS = 3
+
+
+@dataclass
+class ActionInfo:
+    detect: Callable
+    label: str
+    start_phase: Any = None
 
 
 def action_jumping_jacks(result, phase):
@@ -35,3 +44,12 @@ def action_jumping_jacks(result, phase):
     if phase == "up" and arms_down:
         return "down", True
     return phase, False
+
+
+# registry: alarm_app looks up everything it needs about an action here
+#   detect      -> function(result, phase) that returns (new_phase, rep_done)
+#   label       -> name shown on screen next to the rep counter
+#   start_phase -> phase passed in on the first frame
+ACTIONS = {
+    Action.JUMPING_JACKS: ActionInfo(detect=action_jumping_jacks, label="Jumping jacks", start_phase="down"),
+}
