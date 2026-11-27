@@ -78,6 +78,9 @@ def load_pose_image(filename, size=(200, 200)):
 # states
 IDLE, RINGING, POSE, ACTION, DONE = "IDLE", "RINGING", "POSE", "ACTION", "DONE"
 
+# every challenge by its lowercase name, e.g. "squat" or "jumping_jacks", for --challenge
+CHALLENGES = {p.name.lower(): p for p in Pose} | {a.name.lower(): a for a in Action}
+
 def main():
     options = vision.PoseLandmarkerOptions(
         base_options=mp.tasks.BaseOptions(model_asset_path=MODEL_PATH),
@@ -92,6 +95,8 @@ def main():
     parser.add_argument("time", nargs="?", default="5s",
                         help="e.g. 3, 10m, 1h30m, 7:30, 6:45pm (default: 5s)")
     parser.add_argument("--debug", action="store_true")
+    parser.add_argument("--challenge", choices=sorted(CHALLENGES),
+                        help="always use this challenge instead of a random one (for testing)")
     args = parser.parse_args()
 
     try:
@@ -110,7 +115,14 @@ def main():
     frame_timestamp_ms = 0
     # psuedorandomly select between an action or pose
     action_or_pose = random.randint(0,1)
-    
+
+    if args.challenge:
+        picked = CHALLENGES[args.challenge]
+        if isinstance(picked, Pose):
+            pose, action_or_pose = picked, 0
+        else:
+            action, action_or_pose = picked, 1
+
     try:
         while True:
             # idle state: wait for the alarm time
