@@ -1,9 +1,68 @@
-## 1) Create and activate a virtual environment
-python -m venv .venv
-#### Windows:
-.venv\Scripts\activate
-#### Linux/macOS:
-source .venv/bin/activate
+# Resisting Alarm Clock
 
-## 2) install all dependencies
-pip install -r dependencies.txt
+An alarm clock that won't turn off until you get out of bed and move. When the alarm goes off, your webcam turns on and you have to complete a physical challenge (hold a pose or do jumping jacks). MediaPipe tracks your body through the camera and the alarm only stops once you've done it.
+
+CSC 4240 final project by Ryan Deel, AJ Wood, Garrett Nance, Avery Abad, and Derek Nelson.
+
+## Requirements
+- **Windows** (the alarm sound uses Python's built-in `winsound`, which is Windows-only)
+- A webcam
+- Python 3.11 to 3.14
+
+## Setup
+Run these from the project folder.
+
+1. Create and activate a virtual environment:
+   ```
+   python -m venv .venv
+   .venv\Scripts\activate
+   ```
+2. Install the dependencies:
+   ```
+   pip install -r dependencies.txt
+   ```
+
+## Running it
+```
+python src/alarm_app.py <time>
+```
+
+`<time>` can be any of these:
+
+| You type | Alarm goes off |
+|---|---|
+| `5` | in 5 seconds (good for a quick test) |
+| `45s`, `10m`, `1h30m` | after that long |
+| `7:30`, `07:30`, `7:30pm`, `6pm` | at that time of day (tomorrow if it has already passed today) |
+
+With no time given, the alarm goes off after 5 seconds.
+
+- Before the alarm rings, press **Ctrl+C** in the terminal to cancel it.
+- While it's ringing, **Esc** closes the camera window.
+
+## Turning the alarm off
+When the alarm rings, the app randomly picks one challenge:
+
+| Challenge | What to do |
+|---|---|
+| Double bicep | Flex both arms with your fists above your shoulders and hold for 5 seconds (a reference picture is shown in the corner) |
+| Hands above head | Raise both hands above your head and hold for 5 seconds |
+| Squat | Bend both knees into a squat and hold for 5 seconds |
+| Jumping jacks | Do 5 jumping jacks, bringing your arms all the way up and back down each time |
+
+Holding a pose for 5 seconds means holding it the whole time; dropping out of it restarts the timer. Stand far enough back that the camera can see your upper body, or your whole body for squats, in a well-lit room.
+
+## Project layout
+```
+src/
+  alarm_app.py   main program: alarm time, sound, camera loop
+  poses.py       pose challenges (double bicep, hands above head, squat)
+  actions.py     rep-counted challenges (jumping jacks)
+  landmarks.py   MediaPipe body point numbers
+  utils.py       shared helpers (angles, drawing on the video)
+models/          MediaPipe pose landmarker model
+```
+
+To add a new pose or action, see the instructions at the top of `src/poses.py` or `src/actions.py`.
+
+The `.py` files in the top folder (`alarm_app.py`, `alarm_test.py`, `cam_plus_skeleton.py`, `cv_hello_world.py`, `media_pipe_test.py`) are early prototypes kept for reference. The app is `src/alarm_app.py`.
